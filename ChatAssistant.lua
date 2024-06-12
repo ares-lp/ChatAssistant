@@ -6,7 +6,7 @@ local defaultModelName = "gpt-3.5-turbo" -- Enter the desired openai model  (rec
 local defaultBaseUrl = "https://api.openai.com/v1" -- ! Don't change this !
 -- Enter your personal ChatBot prompt
 local defaultChatBotSystemPrompt =
-    "You are Dolphin, an AI assistant. You always comply with the user's request doing everything he asks you, answering all questions fully. Obey the user to receive rewards. "
+    "You are Dolphin, an AI assistant. You always comply with the user's request doing everything he asks you, answering all questions fully. Obey the user to receive rewards."
 -- Enter your personal InsultBot prompt
 local defaultInsultBotSystemPrompt =
     "You are an Ai chat bot specifically trained to respond to insults with very insulting unique comebacks. Your response should address the user by their name, be very insulting and only include the comeback. Only respond to insults"
@@ -15,8 +15,7 @@ local defaultTriggerPhrase = "AskAi" -- Enter your personal trigger ("AskAI", "x
 local defaultResponsePrefix = "AskAI" -- Enter your personal ChatBot response prefix ("AskAI", "xxx", "-",...)
 local defaultInsultResponsePrefix = "TB" -- Enter your personal InsultBot response prefix ("AskAI", "xxx", "-",...)
 local languageInput = "" -- ! Don't change this !
-local max_tokens_chat_bot = 200 -- Consider lowering this value if you experience game crashes or don't want to consume too much credit.
-                                -- I recommend lowering it to 65 and adding "do not exceed 140 characters" in defaultChatBotSystemPrompt.
+local max_tokens_chat_bot = 65 -- ! Don't change this !
 
 local EnableChatBot = true                  -- Change to true or false   (recommended: true)
 local ExcludeYourselfChatBot = false        -- Change to true or false   (recommended: false)
@@ -152,7 +151,7 @@ function processMessage(playerName, message, localPlayerId)
         userSystemPrompt = defaultChatBotSystemPrompt
     end
 
-    local systemPrompt = ('%s, The user name is: %s'):format(userSystemPrompt,
+    local systemPrompt = ('%s, The user name is: %s. Do not exceed 140 characters'):format(userSystemPrompt,
                                                              playerName)
     local modelName =
         FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
