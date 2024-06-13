@@ -16,6 +16,10 @@ local defaultResponsePrefix = "AskAI" -- Enter your personal ChatBot response pr
 local defaultInsultResponsePrefix = "TB" -- Enter your personal InsultBot response prefix ("AskAI", "xxx", "-",...)
 local languageInput = "" -- ! Don't change this !
 local max_tokens_chat_bot = 65 -- ! Don't change this !
+local chatBotRememberedMessages = 0     -- chatBot will remember N messages * 2 (User request & response)
+                                        -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
+local insultBotRememberedMessages = 0   -- insulBot will remember N messages * 2 (User request & response)
+                                        -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
 
 local EnableChatBot = true                  -- Change to true or false   (recommended: true)
 local ExcludeYourselfChatBot = false        -- Change to true or false   (recommended: false)
@@ -109,7 +113,44 @@ local responsePrefix =
 local insultResponsePrefix = FeatureMgr.GetFeature(Utils.Joaat(
                                                        "LUA_insultResponsePrefix")):GetStringValue()
 
-GUI.AddToast("CheraxAI", "Started successfully", 3000)
+GUI.AddToast("ChatAssistant", "Started successfully", 3000)
+
+local log = {}
+local insultlog = {}
+
+local function addMessageToLog(log, message)
+    if #log > 2 * chatBotRememberedMessages then
+        table.remove(log, 1)
+        table.remove(log, 1)
+    end
+    table.insert(log, message)
+end
+
+local function addMessageToInsultLog(insultlog, message)
+    if #insultlog > 2 * insultBotRememberedMessages then
+        table.remove(insultlog, 1)
+        table.remove(insultlog, 1)
+    end
+    table.insert(insultlog, message)
+end
+
+local function buildMessageLog()
+    local messages = {}
+    for i = 1, #log do
+        local role = i % 2 == 0 and "assistant" or "user"
+        table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role, log[i]))
+    end
+    return table.concat(messages, ", ")
+end
+
+local function buildMessageInsultLog()
+    local messages = {}
+    for i = 1, #insultlog do
+        local role = i % 2 == 0 and "assistant" or "user"
+        table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role, insultlog[i]))
+    end
+    return table.concat(messages, ", ")
+end
 
 function getResponseText(jsonResponse)
     if jsonResponse ~= nil and string.find(jsonResponse, '"content":%s*"') then
@@ -132,8 +173,8 @@ end
 
 function processMessage(playerName, message, localPlayerId)
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Process Triggered"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Process Triggered"):format())
+        GUI.AddToast("ChatAssistant", ("Process Triggered"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Process Triggered"):format())
     end
 
     local curlRequest = Curl.Easy()
@@ -151,7 +192,7 @@ function processMessage(playerName, message, localPlayerId)
         userSystemPrompt = defaultChatBotSystemPrompt
     end
 
-    local systemPrompt = ('%s, The user name is: %s. Do not exceed 140 characters'):format(userSystemPrompt,
+    local systemPrompt = ('%s, The user name is: %s. Do not exceed 140 characters.'):format(userSystemPrompt,
                                                              playerName)
     local modelName =
         FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -163,31 +204,33 @@ function processMessage(playerName, message, localPlayerId)
 
     if string.len(userApiKey) == 0 then userApiKey = defaultApiKey end
 
-    local requestInputText = string.gsub(message, '"', '\\"')
+    local requestInputText = string.gsub(message, '"', '\\"') -- not used
     local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
+    local messageLog = buildMessageLog()
+    
     local requestText =
-        ('{ "model": "%s", "messages": [ { "role": "system", "content": "%s" }, { "role": "user", "content": "%s" } ], "max_tokens": %d, "temperature": 0.8 }'):format(
-            modelName, systemPrompt, requestInputText,max_tokens_chat_bot)
+        ('{ "model": "%s", "messages": [ { "role": "system", "content": "%s"}, %s ], "max_tokens": %d, "temperature": 0.8 }'):format(
+            modelName, systemPrompt, messageLog,max_tokens_chat_bot)
 
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("URL: %s"):format(completionEndpointUrl), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("chatAssistant", ("URL: %s"):format(completionEndpointUrl), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("URL: %s"):format(completionEndpointUrl))
 
-        GUI.AddToast("CheraxAI", ("System Prompt: %s"):format(systemPrompt),
+        GUI.AddToast("ChatAssistant", ("System Prompt: %s"):format(systemPrompt),
                      3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("System Prompt: %s"):format(systemPrompt))
 
-        GUI.AddToast("CheraxAI", ("Model: %s"):format(modelName), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Model: %s"):format(modelName))
+        GUI.AddToast("ChatAssistant", ("Model: %s"):format(modelName), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Model: %s"):format(modelName))
 
-        GUI.AddToast("CheraxAI", ("Input: %s"):format(requestInputText), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("ChatAssistant", ("Input: %s"):format(requestInputText), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("Input: %s"):format(requestInputText))
 
-        GUI.AddToast("CheraxAI", ("Request: %s"):format(requestText), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("ChatAssistant", ("Request: %s"):format(requestText), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("Request: %s"):format(requestText))
     end
 
@@ -204,16 +247,16 @@ function processMessage(playerName, message, localPlayerId)
     while not curlRequest:GetFinished() do Script.Yield(1) end
 
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Request finished."):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Request finished."):format())
+        GUI.AddToast("ChatAssistant", ("Request finished."):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Request finished."):format())
     end
 
     processResponseCode, processResponseContent = curlRequest:GetResponse()
     if debugEnabled then
-        GUI.AddToast("CheraxAI",
+        GUI.AddToast("ChatAssistant",
                      ("processResponseCode: %s | processResponseContent: %s"):format(
                          processResponseCode, processResponseContent), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("processResponseCode: %s | processResponseContent: %s"):format(
                        processResponseCode, processResponseContent))
     end
@@ -222,27 +265,28 @@ function processMessage(playerName, message, localPlayerId)
         processResponseCode ~= eCurlCode.CURLE_OK then
         if (processResponseContent == nil or string.len(processResponseContent) ==
             0) then
-            GUI.AddToast("CheraxAI", ("Failed: response is nil"):format(), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            GUI.AddToast("ChatAssistant", ("Failed: response is nil"):format(), 3000)
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: response is nil"):format())
         else
-            GUI.AddToast("CheraxAI", ("Failed: %s"):format(
+            GUI.AddToast("ChatAssistant", ("Failed: %s"):format(
                              eCurlCodes[processResponseCode]), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: %s"):format(eCurlCodes[processResponseCode]))
         end
         processResponse = ""
     else
         processResponse = getResponseText(processResponseContent)
         if debugEnabled then
-            GUI.AddToast("CheraxAI",
+            GUI.AddToast("ChatAssistant",
                          ("FinalResponse: %s"):format(processResponse), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("FinalResponse: %s"):format(processResponse))
         end
     end
 
     local response = ("%s: %s"):format(responsePrefix, processResponse)
+    addMessageToLog(log,response)
     if string.len(response) > string.len(responsePrefix) then
         GTA.AddChatMessageToPool(localPlayerId, response, false)
         GTA.SendChatMessageToEveryone(response, false)
@@ -251,8 +295,8 @@ end
 
 function processInsultingMessage(playerName, message, localPlayerId)
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Process Triggered"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Process Triggered"):format())
+        GUI.AddToast("ChatAssistant", ("Process Triggered"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Process Triggered"):format())
     end
     local curlRequest = Curl.Easy()
     local processResponse = ""
@@ -281,9 +325,34 @@ function processInsultingMessage(playerName, message, localPlayerId)
 
     local requestInputText = string.gsub(message, '"', '\\"')
     local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
+    local messageLog = buildMessageInsultLog()
+    
     local requestText =
-        ('{ "model": "%s", "messages": [ { "role": "system", "content": "%s" }, { "role": "user", "content": "%s" } ], "max_tokens": 65, "temperature": 0.8 }'):format(
-            modelName, systemPrompt, requestInputText)
+        ('{ "model": "%s", "messages": [ { "role": "system", "content": "%s"}, %s ], "max_tokens": 65, "temperature": 0.8 }'):format(
+            modelName, systemPrompt, messageLog)
+
+    if debugEnabled then
+        GUI.AddToast("chatAssistant", ("URL: %s"):format(completionEndpointUrl), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
+                   ("URL: %s"):format(completionEndpointUrl))
+        
+        GUI.AddToast("ChatAssistant", ("System Prompt: %s"):format(systemPrompt),
+                             3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
+                    ("System Prompt: %s"):format(systemPrompt))
+        
+        GUI.AddToast("ChatAssistant", ("Model: %s"):format(modelName), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Model: %s"):format(modelName))
+        
+        GUI.AddToast("ChatAssistant", ("Input: %s"):format(requestInputText), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
+                    ("Input: %s"):format(requestInputText))
+        
+        GUI.AddToast("ChatAssistant", ("Request: %s"):format(requestText), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
+                    ("Request: %s"):format(requestText))
+    end
+
     curlRequest:Setopt(eCurlOption.CURLOPT_URL, completionEndpointUrl)
     if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableAuth")) then
         curlRequest:AddHeader(authHeaderText)
@@ -296,17 +365,17 @@ function processInsultingMessage(playerName, message, localPlayerId)
     while not curlRequest:GetFinished() do Script.Yield(1) end
 
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Request finished."):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Request finished."):format())
+        GUI.AddToast("ChatAssistant", ("Request finished."):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Request finished."):format())
     end
     processInsultingResponseCode, processInsultingResponseContent =
         curlRequest:GetResponse()
     if debugEnabled then
-        GUI.AddToast("CheraxAI",
+        GUI.AddToast("ChatAssistant",
                      ("processInsultingResponseCode: %s | processInsultingResponseContent: %s"):format(
                          processInsultingResponseCode,
                          processInsultingResponseContent), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("processInsultingResponseCode: %s | processInsultingResponseContent: %s"):format(
                        processInsultingResponseCode,
                        processInsultingResponseContent))
@@ -316,13 +385,13 @@ function processInsultingMessage(playerName, message, localPlayerId)
         processInsultingResponseCode ~= eCurlCode.CURLE_OK then
         if (processResponseContent == nil or
             string.len(processInsultingResponseContent) == 0) then
-            GUI.AddToast("CheraxAI", ("Failed: response is nil"):format(), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            GUI.AddToast("ChatAssistant", ("Failed: response is nil"):format(), 3000)
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: response is nil"):format())
         else
-            GUI.AddToast("CheraxAI", ("Failed: %s"):format(
+            GUI.AddToast("ChatAssistant", ("Failed: %s"):format(
                              eCurlCodes[processInsultingResponseCode]), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Failed: %s"):format(
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Failed: %s"):format(
                            eCurlCodes[processInsultingResponseCode]))
         end
         return
@@ -330,13 +399,14 @@ function processInsultingMessage(playerName, message, localPlayerId)
         processInsultingResponse = getResponseText(
                                        processInsultingResponseContent)
         if debugEnabled then
-            GUI.AddToast("CheraxAI", ("FinalResponse: %s"):format(
+            GUI.AddToast("ChatAssistant", ("FinalResponse: %s"):format(
                              processInsultingResponse), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("FinalResponse: %s"):format(processInsultingResponse))
         end
         local response = ("%s: %s"):format(insultResponsePrefix,
                                            processInsultingResponse)
+        addMessageToInsultLog(insultlog,response)
         if string.len(response) > string.len(insultResponsePrefix) then
             GTA.AddChatMessageToPool(localPlayerId, response, false)
             GTA.SendChatMessageToEveryone(response, false)
@@ -346,8 +416,8 @@ end
 
 function checkMessageForInsult(message, playerName, localPlayerId)
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Insult Check Triggered"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("ChatAssistant", ("Insult Check Triggered"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("Check Insult Triggered"):format())
     end
     local curlRequest = Curl.Easy()
@@ -387,26 +457,27 @@ function checkMessageForInsult(message, playerName, localPlayerId)
         eCurlCode.CURLE_OK then
         if (checkInsultResponseContent == nil or
             string.len(checkInsultResponseContent) == 0) then
-            GUI.AddToast("CheraxAI", ("Failed: response is nil"):format(), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            GUI.AddToast("ChatAssistant", ("Failed: response is nil"):format(), 3000)
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: response is nil"):format())
         else
-            GUI.AddToast("CheraxAI", ("Failed: %s"):format(
+            GUI.AddToast("ChatAssistant", ("Failed: %s"):format(
                              eCurlCodes[checkInsultResponseCode]), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Failed: %s"):format(
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Failed: %s"):format(
                            eCurlCodes[checkInsultResponseCode]))
         end
         return
     else
         insultResponse = getResponseText(checkInsultResponseContent)
         if debugEnabled then
-            GUI.AddToast("CheraxAI",
+            GUI.AddToast("ChatAssistant",
                          ("Insult Check Response: %s"):format(insultResponse),
                          3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Insult Check Response: %s"):format(finalResponse))
         end
         if insultResponse ~= nil and insultResponse == "true" then
+            addMessageToInsultLog(insultlog,message)
             Script.QueueJob(processInsultingMessage, playerName, message,
                             localPlayerId)
         end
@@ -415,8 +486,8 @@ end
 
 function checkMessageLanguage(message, playername, localPlayerId)
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Language Check Triggered"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("ChatAssistant", ("Language Check Triggered"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("Check Language Triggered"):format())
     end
     local curlRequest = Curl.Easy()
@@ -457,23 +528,23 @@ function checkMessageLanguage(message, playername, localPlayerId)
         checkLanguageResponseCode ~= eCurlCode.CURLE_OK then
         if (checkLanguageResponseContent == nil or
             string.len(checkLanguageResponseContent) == 0) then
-            GUI.AddToast("CheraxAI", ("Failed: response is nil"):format(), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            GUI.AddToast("ChatAssistant", ("Failed: response is nil"):format(), 3000)
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: response is nil"):format())
         else
-            GUI.AddToast("CheraxAI", ("Failed: %s"):format(
+            GUI.AddToast("ChatAssistant", ("Failed: %s"):format(
                              eCurlCodes[checkLanguageResponseCode]), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Failed: %s"):format(
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Failed: %s"):format(
                            eCurlCodes[checkLanguageResponseCode]))
         end
         return
     else
         languageResponse = getResponseText(checkLanguageResponseContent)
         if debugEnabled then
-            GUI.AddToast("CheraxAI",
+            GUI.AddToast("ChatAssistant",
                          ("Detected Language: %s"):format(languageResponse),
                          3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Detected Language: %s"):format(languageResponse))
         end
         if languageResponse ~= nil and
@@ -485,8 +556,8 @@ end
 
 function translateMessage(playerName, message, localPlayerId)
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Triggered Translate"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+        GUI.AddToast("ChatAssistant", ("Triggered Translate"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                    ("Translate Triggered"):format())
     end
     local curlRequest = Curl.Easy()
@@ -527,13 +598,13 @@ function translateMessage(playerName, message, localPlayerId)
         checkTranslateResponseCode ~= eCurlCode.CURLE_OK then
         if (checkTranslateResponseContent == nil or
             string.len(checkTranslateResponseContent) == 0) then
-            GUI.AddToast("CheraxAI", ("Failed: response is nil"):format(), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            GUI.AddToast("ChatAssistant", ("Failed: response is nil"):format(), 3000)
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Failed: response is nil"):format())
         else
-            GUI.AddToast("CheraxAI", ("Failed: %s"):format(
+            GUI.AddToast("ChatAssistant", ("Failed: %s"):format(
                              eCurlCodes[checkTranslateResponseCode]), 3000)
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Failed: %s"):format(
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Failed: %s"):format(
                            eCurlCodes[checkTranslateResponseCode]))
         end
         return
@@ -541,7 +612,7 @@ function translateMessage(playerName, message, localPlayerId)
         translateResponse = ("%s: %s"):format(playerName, getResponseText(
                                                   checkTranslateResponseContent))
         if string.len(translateResponse) > 0 then
-            Logger.Log(eLogColor.YELLOW, 'CheraxAI',
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
                        ("Translate response: %s"):format(translateResponse))
             GTA.AddChatMessageToPool(localPlayerId, translateResponse, false)
             if FeatureMgr.IsFeatureEnabled(Utils.Joaat(
@@ -556,8 +627,8 @@ function onChatMessage(player, message)
     local localPlayerId = GTA.GetLocalPlayerId()
     local playerName = player:GetName()
     if debugEnabled then
-        GUI.AddToast("CheraxAI", ("Message Detected"):format(), 3000)
-        Logger.Log(eLogColor.YELLOW, 'CheraxAI', ("Message Detected"):format())
+        GUI.AddToast("ChatAssistant", ("Message Detected"):format(), 3000)
+        Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Message Detected"):format())
     end
     -----------------INPUTS-----------------
     triggerPhrase =
@@ -594,6 +665,7 @@ function onChatMessage(player, message)
             debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat(
                                                            "LUA_EnableDebug"))
             if string.find(string.lower(message), string.lower(triggerPhrase)) then
+                addMessageToLog(log,message)
                 Script.QueueJob(processMessage, playerName, message,
                                 localPlayerId)
             end
@@ -654,7 +726,7 @@ end
 local function renderTab()
     local NUM_COLUMNS = 1
     local flags = ImGuiTableFlags.SizingStretchSame
-    if ImGui.BeginTable("CheraxAiTable", NUM_COLUMNS, flags) then
+    if ImGui.BeginTable("ChatAssistantTable", NUM_COLUMNS, flags) then
         ImGui.TableNextRow()
         for column = 0, NUM_COLUMNS - 1 do
             ImGui.TableSetColumnIndex(column)
