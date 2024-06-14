@@ -1,4 +1,4 @@
--- v 1.1.2 
+-- @1.3.0
 package.path = FileMgr.GetMenuRootPath() .. "\\Lua\\?.lua;"
 -------------------------------------------------------------Your default settings---------------------------------------------------------------
 local defaultApiKey = "" -- Enter your OpenAI API Key
@@ -11,7 +11,7 @@ local defaultChatBotSystemPrompt =
 local defaultInsultBotSystemPrompt =
     "You are an Ai chat bot specifically trained to respond to insults with very insulting unique comebacks. Your response should address the user by their name, be very insulting and only include the comeback. Only respond to insults"
 local defaultLanguageInput = "English" -- Enter the language to which you want to translate ("Italian", "French", "Russian", "Chinese",...)
-local defaultTriggerPhrase = "AskAi" -- Enter your personal trigger ("AskAI", "xxx", "-",...)
+local defaultTriggerPhrase = "askai" -- Enter your personal trigger ("AskAI", "xxx", "-",...)
 local defaultResponsePrefix = "AskAI" -- Enter your personal ChatBot response prefix ("AskAI", "xxx", "-",...)
 local defaultInsultResponsePrefix = "TB" -- Enter your personal InsultBot response prefix ("AskAI", "xxx", "-",...)
 local languageInput = "" -- ! Don't change this !
@@ -23,10 +23,13 @@ local insultBotRememberedMessages = 0   -- insulBot will remember N messages * 2
 
 local EnableChatBot = true                  -- Change to true or false   (recommended: true)
 local ExcludeYourselfChatBot = false        -- Change to true or false   (recommended: false)
+local TeamOnlyChatBot = false               -- Change to true or false   (recommended: false)
 local EnableInsultBot = false               -- Change to true or false   (recommended: false)
 local ExcludeYourselfInsultBot = false      -- Change to true or false   (recommended: false)
+local TeamOnlyInsultBot = false             -- Change to true or false   (recommended: false)
 local EnableAiTranslation = false           -- Change to true or false   (recommended: false)
 local ExcludeYourselfAiTranslation = false  -- Change to true or false   (recommended: false)
+local TeamOnlyAiTranslation = false         -- Change to true or false   (recommended: false)
 local EnableAiTranslationEveryone = false   -- Change to true or false   (recommended: false)
 local EnableDebug = false                   -- Change to true or false   (recommended: false)
 local EnableAuth = true                     -- Change to true or false   (recommended: true)
@@ -36,20 +39,27 @@ local EnableAuth = true                     -- Change to true or false   (recomm
 -------------------------------------------------------------Ui Elements Definitions-------------------------------------------------------------
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableChatBot"), "Enable Chat Bot",
                       eFeatureType.Toggle):SetDefaultValue(EnableChatBot):Reset() 
-FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"), "Exclude Yourself",
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"), "Exclude me",
                       eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfChatBot):Reset() 
+FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyChatBot"), "Team Only",
+                      eFeatureType.Toggle):SetDefaultValue(TeamOnlyChatBot):Reset()                      
                       
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableInsultBot"), "Enable Insult Bot",
                       eFeatureType.Toggle):SetDefaultValue(EnableInsultBot):Reset() 
-FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"), "Exclude Yourself",
-                      eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfInsultBot):Reset()   
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"), "Exclude me",
+                      eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfInsultBot):Reset()
+FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"), "Team Only ",
+                      eFeatureType.Toggle):SetDefaultValue(TeamOnlyInsultBot):Reset()   
 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslation"), "Enable Translation", 
                       eFeatureType.Toggle):SetDefaultValue(EnableAiTranslation):Reset() 
-FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"),"Exclude Yourself", 
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"),"Exclude me", 
                       eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfAiTranslation):Reset() 
+FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"), "Team Only  ",
+                      eFeatureType.Toggle):SetDefaultValue(TeamOnlyAiTranslation):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"),"Everyone can see", 
                       eFeatureType.Toggle):SetDefaultValue(EnableAiTranslationEveryone):Reset() 
+
                       
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableDebug"), "Enable Debug",
                       eFeatureType.Toggle):SetDefaultValue(EnableDebug):Reset() 
@@ -192,7 +202,7 @@ function processMessage(playerName, message, localPlayerId)
         userSystemPrompt = defaultChatBotSystemPrompt
     end
 
-    local systemPrompt = ('%s, The user name is: %s. Do not exceed 140 characters.'):format(userSystemPrompt,
+    local systemPrompt = ('%s, The user name is: %s. Do not exceed 250 characters.'):format(userSystemPrompt,
                                                              playerName)
     local modelName =
         FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -288,8 +298,13 @@ function processMessage(playerName, message, localPlayerId)
     local response = ("%s: %s"):format(responsePrefix, processResponse)
     addMessageToLog(log,response)
     if string.len(response) > string.len(responsePrefix) then
-        GTA.AddChatMessageToPool(localPlayerId, response, false)
-        GTA.SendChatMessageToEveryone(response, false)
+        if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyChatBot")) then
+            GTA.AddChatMessageToPool(localPlayerId, response, false)
+            GTA.SendChatMessageToEveryone(response, false)
+        else    
+            GTA.AddChatMessageToPool(localPlayerId, response, true)
+            GTA.SendChatMessageToEveryone(response, true)
+        end
     end
 end
 
@@ -408,8 +423,13 @@ function processInsultingMessage(playerName, message, localPlayerId)
                                            processInsultingResponse)
         addMessageToInsultLog(insultlog,response)
         if string.len(response) > string.len(insultResponsePrefix) then
-            GTA.AddChatMessageToPool(localPlayerId, response, false)
-            GTA.SendChatMessageToEveryone(response, false)
+            if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyInsultBot")) then
+                GTA.AddChatMessageToPool(localPlayerId, response, false)
+                GTA.SendChatMessageToEveryone(response, false)
+            else
+                GTA.AddChatMessageToPool(localPlayerId, response, true)
+                GTA.SendChatMessageToEveryone(response, true)
+            end
         end
     end
 end
@@ -611,12 +631,16 @@ function translateMessage(playerName, message, localPlayerId)
     else
         translateResponse = ("%s: %s"):format(playerName, getResponseText(
                                                   checkTranslateResponseContent))
+        local teamonly = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyAiTranslation"))
         if string.len(translateResponse) > 0 then
-            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',
-                       ("Translate response: %s"):format(translateResponse))
-            GTA.AddChatMessageToPool(localPlayerId, translateResponse, false)
-            if FeatureMgr.IsFeatureEnabled(Utils.Joaat(
-                                               "LUA_EnableAiTranslationEveryone")) then
+            Logger.Log(eLogColor.YELLOW, 'ChatAssistant',("Translate response: %s"):format(translateResponse))
+            if not teamonly then
+                GTA.AddChatMessageToPool(localPlayerId, translateResponse, false)
+            else
+                GTA.AddChatMessageToPool(localPlayerId, translateResponse, true)
+                GTA.SendChatMessageToEveryone(translateResponse, true)
+            end
+            if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableAiTranslationEveryone")) then
                 GTA.SendChatMessageToEveryone(translateResponse, false)
             end
         end
@@ -625,6 +649,7 @@ end
 
 function onChatMessage(player, message)
     local localPlayerId = GTA.GetLocalPlayerId()
+    local playerId = player.PlayerId
     local playerName = player:GetName()
     if debugEnabled then
         GUI.AddToast("ChatAssistant", ("Message Detected"):format(), 3000)
@@ -662,27 +687,31 @@ function onChatMessage(player, message)
         not string.find(string.lower(message), string.lower(playerName) .. ":") then
         -- EnableChatBot    
         if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableChatBot")) then
-            debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat(
-                                                           "LUA_EnableDebug"))
-            if string.find(string.lower(message), string.lower(triggerPhrase)) then
-                addMessageToLog(log,message)
-                Script.QueueJob(processMessage, playerName, message,
-                                localPlayerId)
-            end
-        end
+            debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableDebug"))
+            if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ExcludeYourselfChatBot")) and playerId == localPlayerId) then
+                if string.find(string.lower(message), string.lower(triggerPhrase)) then
+                    addMessageToLog(log, message)
+                    Script.QueueJob(processMessage, playerName, message, localPlayerId)
+                end
+            end    
+        end        
         -- EnableInsultBot
         if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableInsultBot")) then
             debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat(
                                                            "LUA_EnableDebug"))
-            Script.QueueJob(checkMessageForInsult, message, playerName,
+            if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_excludeYourselfInsultBot")) and playerId == localPlayerId) then                                               
+                Script.QueueJob(checkMessageForInsult, message, playerName,
                             localPlayerId)
+            end
         end
         -- EnableAiTranslation
         if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableAiTranslation")) then
             debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat(
                                                            "LUA_EnableDebug"))
-            Script.QueueJob(checkMessageLanguage, message, playerName,
+            if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ExcludeYourselfAiTranslation")) and playerId == localPlayerId) then                                               
+                Script.QueueJob(checkMessageLanguage, message, playerName,
                             localPlayerId)
+            end
         end
 
     end
@@ -699,19 +728,25 @@ local function childWindowElements()
         ClickGUI.RenderFeature(Utils.Joaat("LUA_ServerBaseUrl"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_ModelName"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableChatBot"))
-        --ImGui.SameLine()
-        --ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyChatBot"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_ChatBotSystemPrompt"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_TriggerPhrase"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_ResponsePrefix"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableInsultBot"))
-        --ImGui.SameLine()
-        --ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultBotSystemPrompt"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultResponsePrefix"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslation"))
-        --ImGui.SameLine()
-        --ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"))
+        ImGui.SameLine()
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"))
         ImGui.SameLine()
         ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"))
         ClickGUI.RenderFeature(Utils.Joaat("LUA_LanguageInputBox"))
