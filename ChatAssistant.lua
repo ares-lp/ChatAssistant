@@ -1,4 +1,4 @@
--- @1.3.1
+-- @1.3.2
 package.path = FileMgr.GetMenuRootPath() .. "\\Lua\\?.lua;"
 -------------------------------------------------------------Your default settings---------------------------------------------------------------
 local defaultApiKey = ""	-- Enter your OpenAI API Key
@@ -15,7 +15,7 @@ local defaultTriggerPhrase = "askai"     -- Enter your personal trigger ("AskAI"
 local defaultResponsePrefix = "AskAI"    -- Enter your personal ChatBot response prefix ("AskAI", "xxx", "-",...)
 local defaultInsultResponsePrefix = "TB" -- Enter your personal InsultBot response prefix ("AskAI", "xxx", "-",...)
 local languageInput = ""                 -- ! Don't change this !
-local max_tokens_chat_bot = 65           -- change this to allow longer responses (don't overdo it, 65 is still fine)
+local max_tokens_chat_bot = 150           -- change this to allow longer responses (don't overdo it, 65 is still fine)
 local chatBotRememberedMessages = 0      -- chatBot will remember N messages * 2 (User request & response)
 										 -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
 local insultBotRememberedMessages = 0    -- insulBot will remember N messages * 2 (User request & response)
@@ -86,7 +86,8 @@ FeatureMgr.AddFeature(Utils.Joaat("LUA_ResponsePrefix"),
 	300)
 FeatureMgr.AddFeature(Utils.Joaat("LUA_InsultBotSystemPrompt"),
 	"Custom System Prompt (You are an insulting assistant.)",
-	eFeatureType.InputText)
+	eFeatureType.InputText):SetMaxValue(
+	300)
 FeatureMgr.AddFeature(Utils.Joaat("LUA_InsultResponsePrefix"),
 	"Response Prefix (TB)", eFeatureType.InputText):SetMaxValue(
 	300)
@@ -128,7 +129,10 @@ GUI.AddToast("ChatAssistant", "Started successfully", 3000)
 local log = {}
 local insultlog = {}
 
-local function addMessageToLog(log, message)
+local function addMessageToLog(log, message, playerName)
+	-- Remove the prefix from the message
+    message = string.gsub(message, '^' .. defaultResponsePrefix .. ': ', '')
+	message = string.gsub(message, '^' .. playerName .. ': ', '')
 	if #log > 2 * chatBotRememberedMessages then
 		table.remove(log, 1)
 		table.remove(log, 1)
@@ -136,7 +140,10 @@ local function addMessageToLog(log, message)
 	table.insert(log, message)
 end
 
-local function addMessageToInsultLog(insultlog, message)
+local function addMessageToInsultLog(insultlog, message, playerName)
+	-- Remove the prefix from the message
+    message = string.gsub(message, '^' .. defaultInsultResponsePrefix .. ': ', '')
+	message = string.gsub(message, '^' .. playerName .. ': ', '')
 	if #insultlog > 2 * insultBotRememberedMessages then
 		table.remove(insultlog, 1)
 		table.remove(insultlog, 1)
@@ -197,12 +204,12 @@ function processMessage(playerName, message, localPlayerId)
 	local userSystemPrompt = string.gsub(
 		FeatureMgr.GetFeature(Utils.Joaat(
 			"LUA_ChatBotSystemPrompt")):GetStringValue(),
-		'"', '\\"')
+		'\\"', '*')
 	if string.len(userSystemPrompt) == 0 then
 		userSystemPrompt = defaultChatBotSystemPrompt
 	end
 
-	local systemPrompt = ('%s, The user name is: %s. '):format(userSystemPrompt,
+	local systemPrompt = ('%s, The user name is: %s. Within string output, you must replace all double-quotes you’d normally produce with single quotes.'):format(userSystemPrompt,
 		playerName)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -214,7 +221,7 @@ function processMessage(playerName, message, localPlayerId)
 
 	if string.len(userApiKey) == 0 then userApiKey = defaultApiKey end
 
-	local requestInputText = string.gsub(message, '"', '\\"') -- not used
+	local requestInputText = string.gsub(message, '"', '*')
 	local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
 	local messageLog = buildMessageLog()
 
@@ -271,7 +278,6 @@ function processMessage(playerName, message, localPlayerId)
 			("processResponseCode: %s | processResponseContent: %s"):format(
 				processResponseCode, processResponseContent))
 	end
-
 	if (processResponseContent == nil or string.len(processResponseContent) == 0) or
 		processResponseCode ~= eCurlCode.CURLE_OK then
 		if (processResponseContent == nil or string.len(processResponseContent) ==
@@ -300,7 +306,7 @@ function processMessage(playerName, message, localPlayerId)
 	local maxLength = 250
 	local startIndex = 1
 	local totalLength = #response
-	addMessageToLog(log, response)
+	addMessageToLog(log, response,playerName)
 	if string.len(response) > string.len(responsePrefix) then
 		while startIndex <= totalLength do
 			local endIndex = math.min(startIndex + maxLength - 1, totalLength)
@@ -337,7 +343,7 @@ function processInsultingMessage(playerName, message, localPlayerId)
 		userSystemPrompt = defaultInsultBotSystemPrompt
 	end
 
-	local systemPrompt = ('%s, The user name is: %s'):format(userSystemPrompt,
+	local systemPrompt = ('%s, The user name is: %s.'):format(userSystemPrompt,
 		playerName)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -435,7 +441,7 @@ function processInsultingMessage(playerName, message, localPlayerId)
 		if #response > 250 then
 			response = string.sub(response, 1, 250)
 		end
-		addMessageToInsultLog(insultlog, response)
+		addMessageToInsultLog(insultlog, response, playerName)
 		if string.len(response) > string.len(insultResponsePrefix) then
 			if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyInsultBot")) then
 				GTA.AddChatMessageToPool(localPlayerId, response, false)
@@ -512,7 +518,7 @@ function checkMessageForInsult(message, playerName, localPlayerId)
 				("Insult Check Response: %s"):format(finalResponse))
 		end
 		if insultResponse ~= nil and insultResponse == "true" then
-			addMessageToInsultLog(insultlog, message)
+			addMessageToInsultLog(insultlog, message, playerName)
 			Script.QueueJob(processInsultingMessage, playerName, message,
 				localPlayerId)
 		end
@@ -532,7 +538,7 @@ function checkMessageLanguage(message, playername, localPlayerId)
 	if string.len(baseUrl) == 0 then baseUrl = defaultBaseUrl end
 	local completionEndpointUrl = baseUrl .. '/chat/completions'
 	local systemPrompt =
-		("Detect the language the user input is using. Respond using only the language name itself in english, If it is only punctuation, an emoji or random char just return %s")
+		("Detect the language the user input is using. Respond using only the language name itself in english, If it is only punctuation, an emoji or random char just return %s.")
 		:format(
 			languageInput)
 	local modelName =
@@ -604,7 +610,7 @@ function translateMessage(playerName, message, localPlayerId)
 	if string.len(baseUrl) == 0 then baseUrl = defaultBaseUrl end
 	local completionEndpointUrl = baseUrl .. '/chat/completions'
 	local systemPrompt =
-		("Translate the user input to %s, Response should only include the translated text"):format(
+		("Translate the user input to %s, Response should only include the translated text. Within string output, you must replace all double-quotes you’d normally produce with single quotes."):format(
 			languageInput)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -708,7 +714,7 @@ function onChatMessage(player, message)
 			debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableDebug"))
 			if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ExcludeYourselfChatBot")) and playerId == localPlayerId) then
 				if string.find(string.lower(message), string.lower(triggerPhrase)) then
-					addMessageToLog(log, message)
+					addMessageToLog(log, message, playerName)
 					Script.QueueJob(processMessage, playerName, message, localPlayerId)
 				end
 			end
