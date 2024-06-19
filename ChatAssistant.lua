@@ -1,4 +1,4 @@
--- @1.3.2
+-- @1.3.3
 package.path = FileMgr.GetMenuRootPath() .. "\\Lua\\?.lua;"
 -------------------------------------------------------------Your default settings---------------------------------------------------------------
 local defaultApiKey = ""	-- Enter your OpenAI API Key
@@ -38,34 +38,46 @@ local EnableAuth = true                    -- Change to true or false   (recomme
 
 -------------------------------------------------------------Ui Elements Definitions-------------------------------------------------------------
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableChatBot"), "Enable Chat Bot",
-	eFeatureType.Toggle):SetDefaultValue(EnableChatBot):Reset()
+	eFeatureType.Toggle, "This will enable ChatBot. In chat, use your customized prefix or the default one.\nExample: askai hello / hello askai"):SetDefaultValue(EnableChatBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"), "Exclude me",
-	eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfChatBot):Reset()
+	eFeatureType.Toggle,"ChatBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfChatBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyChatBot"), "Team Only",
-	eFeatureType.Toggle):SetDefaultValue(TeamOnlyChatBot):Reset()
+	eFeatureType.Toggle, "Responses are only visible in the team"):SetDefaultValue(TeamOnlyChatBot):Reset()
 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableInsultBot"), "Enable Insult Bot",
-	eFeatureType.Toggle):SetDefaultValue(EnableInsultBot):Reset()
+	eFeatureType.Toggle, "This will enable InsultBot. You don't need a prefix. Example: Shut up.\nTurn off when not needed to avoid using up too much credit"):SetDefaultValue(EnableInsultBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"), "Exclude me",
-	eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfInsultBot):Reset()
+	eFeatureType.Toggle, "InsultBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfInsultBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"), "Team Only ",
-	eFeatureType.Toggle):SetDefaultValue(TeamOnlyInsultBot):Reset()
-
+	eFeatureType.Toggle, "Responses are only visible in the team"):SetDefaultValue(TeamOnlyInsultBot):Reset()
+local descTranslation = "This will enable the translator. By default, anything that is not English will be translated. " ..
+    					"You can change the language in the 'defaultLanguageInput' file or below. Only you will see the translation. " ..
+   						"Turn off when not needed to avoid using up too much credit"
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslation"), "Enable Translation",
-	eFeatureType.Toggle):SetDefaultValue(EnableAiTranslation):Reset()
+	eFeatureType.Toggle, ("%s"):format(descTranslation)):SetDefaultValue(EnableAiTranslation):Reset()   
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"), "Exclude me",
-	eFeatureType.Toggle):SetDefaultValue(ExcludeYourselfAiTranslation):Reset()
+	eFeatureType.Toggle, "InsultBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfAiTranslation):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"), "Team Only  ",
-	eFeatureType.Toggle):SetDefaultValue(TeamOnlyAiTranslation):Reset()
+	eFeatureType.Toggle, "Responses are only visible in the team",
+	function(f)
+		if f:GetBoolValue() then
+			FeatureMgr.GetFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone")):SetValue(false)
+		end
+	end,false):SetDefaultValue(TeamOnlyAiTranslation):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"), "Everyone can see",
-	eFeatureType.Toggle):SetDefaultValue(EnableAiTranslationEveryone):Reset()
+	eFeatureType.Toggle, "Everyone can see the translation",
+	function(f)
+        if f:GetBoolValue() then
+			FeatureMgr.GetFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation")):SetValue(false)
+		end
+    end,false):SetDefaultValue(EnableAiTranslationEveryone):Reset()
 
 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableDebug"), "Enable Debug",
 	eFeatureType.Toggle):SetDefaultValue(EnableDebug):Reset()
 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAuth"), "Enable Authorization",
-	eFeatureType.Toggle):SetDefaultValue(EnableAuth):Reset()
+	eFeatureType.Toggle, "It must be turned on to work"):SetDefaultValue(EnableAuth):Reset()
 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ServerBaseUrl"),
 	"Server Base URL (https://api.openai.com/v1)",
@@ -155,7 +167,7 @@ local function buildMessageLog()
 	local messages = {}
 	for i = 1, #log do
 		local role = i % 2 == 0 and "assistant" or "user"
-		table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role, log[i]))
+		table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role,  log[i]))
 	end
 	return table.concat(messages, ", ")
 end
@@ -164,26 +176,44 @@ local function buildMessageInsultLog()
 	local messages = {}
 	for i = 1, #insultlog do
 		local role = i % 2 == 0 and "assistant" or "user"
-		table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role, insultlog[i]))
+		table.insert(messages, string.format('{ "role": "%s", "content": "%s" }', role,  insultlog[i]))
 	end
 	return table.concat(messages, ", ")
 end
 
+
 function getResponseText(jsonResponse)
 	if jsonResponse ~= nil and string.find(jsonResponse, '"content":%s*"') then
-		local start_pos = string.len('')
-		if string.find(jsonResponse, '"content": "') then
-			start_pos = string.find(jsonResponse, '"content": "') +
-				string.len('"content": "')
+	  local start_pos = string.len('')
+	  if string.find(jsonResponse, '"content": "') then
+		start_pos = string.find(jsonResponse, '"content": "') + string.len('"content": "')
+	  else
+		start_pos = string.find(jsonResponse, '"content":"') + string.len('"content":"')
+	  end
+  
+	  local end_pos = nil
+	  local current_pos = start_pos
+	  while true do
+		local next_quote_pos = string.find(jsonResponse, '"', current_pos)
+		if not next_quote_pos then
+		  break -- No more quotes found
+		end
+  
+		-- Check if the current quote is escaped
+		if string.sub(jsonResponse, next_quote_pos - 1, next_quote_pos - 1) == "\\" then
+		  current_pos = next_quote_pos + 1 -- Skip escaped quote
 		else
-			start_pos = string.find(jsonResponse, '"content":"') +
-				string.len('"content":"')
+		  end_pos = next_quote_pos
+		  break -- Found unescaped end quote
 		end
-		local end_pos = string.find(jsonResponse, '"', start_pos)
-		if start_pos and end_pos then
-			return string.gsub(string.sub(jsonResponse, start_pos, end_pos - 1),
-				"\\n\\n", ' ')
-		end
+	  end
+  
+	  if start_pos and end_pos then
+		local extracted_text = string.sub(jsonResponse, start_pos, end_pos - 1)
+		-- Replace all occurrences of \n with a single space
+		local cleaned_text = string.gsub(extracted_text, "\\n", ' ')
+		return cleaned_text
+	  end
 	end
 	return nil
 end
@@ -204,12 +234,12 @@ function processMessage(playerName, message, localPlayerId)
 	local userSystemPrompt = string.gsub(
 		FeatureMgr.GetFeature(Utils.Joaat(
 			"LUA_ChatBotSystemPrompt")):GetStringValue(),
-		'\\"', '*')
+		'"', '\\"')
 	if string.len(userSystemPrompt) == 0 then
 		userSystemPrompt = defaultChatBotSystemPrompt
 	end
 
-	local systemPrompt = ('%s, The user name is: %s. Within string output, you must replace all double-quotes you’d normally produce with single quotes.'):format(userSystemPrompt,
+	local systemPrompt = ('%s, The user name is: %s. '):format(userSystemPrompt,
 		playerName)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -221,7 +251,7 @@ function processMessage(playerName, message, localPlayerId)
 
 	if string.len(userApiKey) == 0 then userApiKey = defaultApiKey end
 
-	local requestInputText = string.gsub(message, '"', '*')
+	local requestInputText = string.gsub(message, '"', '\\"')
 	local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
 	local messageLog = buildMessageLog()
 
@@ -310,7 +340,7 @@ function processMessage(playerName, message, localPlayerId)
 	if string.len(response) > string.len(responsePrefix) then
 		while startIndex <= totalLength do
 			local endIndex = math.min(startIndex + maxLength - 1, totalLength)
-			local segment = response:sub(startIndex, endIndex)
+			local segment = string.gsub(response:sub(startIndex, endIndex),'\\"','"')
 
 			if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyChatBot")) then
 				GTA.AddChatMessageToPool(localPlayerId, segment, false)
@@ -442,6 +472,7 @@ function processInsultingMessage(playerName, message, localPlayerId)
 			response = string.sub(response, 1, 250)
 		end
 		addMessageToInsultLog(insultlog, response, playerName)
+		response = string.sub(response,'\\"','"')
 		if string.len(response) > string.len(insultResponsePrefix) then
 			if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyInsultBot")) then
 				GTA.AddChatMessageToPool(localPlayerId, response, false)
@@ -547,7 +578,7 @@ function checkMessageLanguage(message, playername, localPlayerId)
 	local userApiKey =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ApiKey")):GetStringValue()
 	if string.len(userApiKey) == 0 then userApiKey = defaultApiKey end
-	local requestInputText = string.gsub(message, '"', '\\"')
+	local requestInputText = message
 	local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
 	local requestText =
 		('{ "model": "%s", "messages": [ { "role": "system", "content": "%s" }, { "role": "user", "content": "%s" } ], "max_tokens": 65, "temperature": 0.8 }')
@@ -610,7 +641,7 @@ function translateMessage(playerName, message, localPlayerId)
 	if string.len(baseUrl) == 0 then baseUrl = defaultBaseUrl end
 	local completionEndpointUrl = baseUrl .. '/chat/completions'
 	local systemPrompt =
-		("Translate the user input to %s, Response should only include the translated text. Within string output, you must replace all double-quotes you’d normally produce with single quotes."):format(
+		("Translate the user input to %s, Response should only include the translated text."):format(
 			languageInput)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -618,7 +649,7 @@ function translateMessage(playerName, message, localPlayerId)
 	local userApiKey =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ApiKey")):GetStringValue()
 	if string.len(userApiKey) == 0 then userApiKey = defaultApiKey end
-	local requestInputText = string.gsub(message, '"', '\\"')
+	local requestInputText = message
 	local authHeaderText = ("Authorization: Bearer %s"):format(userApiKey)
 	local requestText =
 		('{ "model": "%s", "messages": [ { "role": "system", "content": "%s" }, { "role": "user", "content": "%s" } ], "max_tokens": 65, "temperature": 0.8 }')
@@ -655,9 +686,9 @@ function translateMessage(playerName, message, localPlayerId)
 	else
 		translateResponse = ("%s: %s"):format(playerName, getResponseText(
 			checkTranslateResponseContent))
+		translateResponse = string.gsub(translateResponse,'\\"','"')
 		local teamonly = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyAiTranslation"))
 		if string.len(translateResponse) > 0 then
-			Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Translate response: %s"):format(translateResponse))
 			if not teamonly then
 				GTA.AddChatMessageToPool(localPlayerId, translateResponse, false)
 			else
@@ -709,6 +740,7 @@ function onChatMessage(player, message)
 		not string.find(string.lower(message),
 			string.lower(insultResponsePrefix) .. ":") and
 		not string.find(string.lower(message), string.lower(playerName) .. ":") then
+		message = string.gsub(message, '"', '\\"')
 		-- EnableChatBot
 		if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableChatBot")) then
 			debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableDebug"))
