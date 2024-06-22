@@ -472,7 +472,7 @@ function processInsultingMessage(playerName, message, localPlayerId)
 			response = string.sub(response, 1, 250)
 		end
 		addMessageToInsultLog(insultlog, response, playerName)
-		response = string.sub(response,'\\"','"')
+		response = string.gsub(response,'\\"','"')
 		if string.len(response) > string.len(insultResponsePrefix) then
 			if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyInsultBot")) then
 				GTA.AddChatMessageToPool(localPlayerId, response, false)
