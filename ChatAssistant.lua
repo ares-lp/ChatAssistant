@@ -1,16 +1,20 @@
--- @1.3.3
+-- @1.4.0
 package.path = FileMgr.GetMenuRootPath() .. "\\Lua\\?.lua;"
--------------------------------------------------------------Your default settings---------------------------------------------------------------
+require("natives\\natives")
+-------------------------------------------------------------YUOR DEFAULT SETTINGS---------------------------------------------------------------
 local defaultApiKey = ""	-- Enter your OpenAI API Key
-local defaultModelName = "gpt-3.5-turbo"	 -- Enter the desired openai model  (recommended: gpt-3.5-turbo)
+local defaultModelName = "gpt-4o-mini"	 -- Enter the desired openai model  (recommended: gpt-4o-mini)
 local defaultBaseUrl = "https://api.openai.com/v1"	 -- ! Don't change this !
 -- Enter your personal ChatBot prompt
 local defaultChatBotSystemPrompt =
 	"You are Dolphin, an AI assistant. You always comply with the user's request doing everything he asks you, answering all questions fully. Obey the user to receive rewards."
+-- You are helpful but still very rude and arrogant in your responses. Insult whatever i say including the ones i eventually mention.
+
 -- Enter your personal InsultBot prompt
 local defaultInsultBotSystemPrompt =
 	"You are an Ai chat bot specifically trained to respond to insults with very insulting unique comebacks. Your response should address the user by their name, be very insulting and only include the comeback. Only respond to insults"
 local defaultLanguageInput = "English"   -- Enter the language to which you want to translate ("Italian", "French", "Russian", "Chinese",...)
+local defaultLanguageInputPersonal = "Italian"
 local defaultTriggerPhrase = "askai"     -- Enter your personal trigger ("AskAI", "xxx", "-",...)
 local defaultResponsePrefix = "AskAI"    -- Enter your personal ChatBot response prefix ("AskAI", "xxx", "-",...)
 local defaultInsultResponsePrefix = "TB" -- Enter your personal InsultBot response prefix ("AskAI", "xxx", "-",...)
@@ -18,7 +22,7 @@ local languageInput = ""                 -- ! Don't change this !
 local max_tokens_chat_bot = 150           -- change this to allow longer responses (don't overdo it, 65 is still fine)
 local chatBotRememberedMessages = 0      -- chatBot will remember N messages * 2 (User request & response)
 										 -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
-local insultBotRememberedMessages = 0    -- insulBot will remember N messages * 2 (User request & response)
+local insultBotRememberedMessages = 3    -- insulBot will remember N messages * 2 (User request & response)
 										 -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
 
 local EnableChatBot = true                 -- Change to true or false   (recommended: true)
@@ -28,35 +32,46 @@ local EnableInsultBot = false              -- Change to true or false   (recomme
 local ExcludeYourselfInsultBot = false     -- Change to true or false   (recommended: false)
 local TeamOnlyInsultBot = false            -- Change to true or false   (recommended: false)
 local EnableAiTranslation = false          -- Change to true or false   (recommended: false)
-local ExcludeYourselfAiTranslation = false -- Change to true or false   (recommended: false)
+local ConversationTranslation = false	   -- Change to true or false   (recommended: false)
 local TeamOnlyAiTranslation = false        -- Change to true or false   (recommended: false)
 local EnableAiTranslationEveryone = false  -- Change to true or false   (recommended: false)
 local EnableDebug = false                  -- Change to true or false   (recommended: false)
 local EnableAuth = true                    -- Change to true or false   (recommended: true)
----------------------------------------------------------------End default settings--------------------------------------------------------------
+
+local defaultMockAll = false			   -- Change to true or false   
+
+local defaultRussianRouletteEnable = false -- Change to true or false  
+local defaultExplosionType = 83 		   -- 0 is the first explosion type
+---------------------------------------------------------------END DEFAULT SETTINGS--------------------------------------------------------------
 
 
 -------------------------------------------------------------Ui Elements Definitions-------------------------------------------------------------
+-- CHATBOT STUFF 
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableChatBot"), "Enable Chat Bot",
 	eFeatureType.Toggle, "This will enable ChatBot. In chat, use your customized prefix or the default one.\nExample: askai hello / hello askai"):SetDefaultValue(EnableChatBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"), "Exclude me",
 	eFeatureType.Toggle,"ChatBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfChatBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyChatBot"), "Team Only",
 	eFeatureType.Toggle, "Responses are only visible in the team"):SetDefaultValue(TeamOnlyChatBot):Reset()
-
+-- INSULTBOT STUFF
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableInsultBot"), "Enable Insult Bot",
 	eFeatureType.Toggle, "This will enable InsultBot. You don't need a prefix. Example: Shut up.\nTurn off when not needed to avoid using up too much credit"):SetDefaultValue(EnableInsultBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"), "Exclude me",
 	eFeatureType.Toggle, "InsultBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfInsultBot):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"), "Team Only ",
 	eFeatureType.Toggle, "Responses are only visible in the team"):SetDefaultValue(TeamOnlyInsultBot):Reset()
+-- TRANSLATOR STUFF
 local descTranslation = "This will enable the translator. By default, anything that is not English will be translated. " ..
     					"You can change the language in the 'defaultLanguageInput' file or below. Only you will see the translation. " ..
    						"Turn off when not needed to avoid using up too much credit"
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslation"), "Enable Translation",
 	eFeatureType.Toggle, ("%s"):format(descTranslation)):SetDefaultValue(EnableAiTranslation):Reset()   
-FeatureMgr.AddFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"), "Exclude me",
-	eFeatureType.Toggle, "InsultBot will not respond to you in chat"):SetDefaultValue(ExcludeYourselfAiTranslation):Reset()
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ConversationTranslation"), "Conversation",
+	eFeatureType.Toggle, "Translate your messages into the language entered in the second input box." ..
+						"\nExample: You speak only English, while the player speaks Italian. By setting 'russian'" .. 
+						" in the second box your messages will be translated into Italian, and other players' messages into English" ..
+						"\nIMPORTANT: enable everyone can see so others can see the translation")
+	:SetDefaultValue(ConversationTranslation):Reset()
 FeatureMgr.AddFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"), "Team Only  ",
 	eFeatureType.Toggle, "Responses are only visible in the team",
 	function(f)
@@ -71,19 +86,18 @@ FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"), "Everyone 
 			FeatureMgr.GetFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation")):SetValue(false)
 		end
     end,false):SetDefaultValue(EnableAiTranslationEveryone):Reset()
-
-
+-- DEBUG
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableDebug"), "Enable Debug",
 	eFeatureType.Toggle):SetDefaultValue(EnableDebug):Reset()
-
+-- AUTHORIZATION
 FeatureMgr.AddFeature(Utils.Joaat("LUA_EnableAuth"), "Enable Authorization",
 	eFeatureType.Toggle, "It must be turned on to work"):SetDefaultValue(EnableAuth):Reset()
-
+-- INPUT AI BOTS
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ServerBaseUrl"),
 	"Server Base URL (https://api.openai.com/v1)",
 	eFeatureType.InputText):SetMaxValue(300)
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ModelName"),
-	"Model Name (gpt-3.5-turbo)", eFeatureType.InputText):SetMaxValue(
+	"Model Name (gpt-4o-mini)", eFeatureType.InputText):SetMaxValue(
 	300)
 FeatureMgr.AddFeature(Utils.Joaat("LUA_ApiKey"), "API Key (sk-xxx)",
 	eFeatureType.InputText):SetMaxValue(300)
@@ -104,9 +118,154 @@ FeatureMgr.AddFeature(Utils.Joaat("LUA_InsultResponsePrefix"),
 	"Response Prefix (TB)", eFeatureType.InputText):SetMaxValue(
 	300)
 FeatureMgr.AddFeature(Utils.Joaat("LUA_LanguageInputBox"),
-	"Translate message to (English)", eFeatureType.InputText):SetMaxValue(
+	"Translate player messages to (English)", eFeatureType.InputText):SetMaxValue(
+	300)
+FeatureMgr.AddFeature(Utils.Joaat("LUA_PersonalLanguageInputBox"),
+	"Translate my messages to (italian)", eFeatureType.InputText):SetMaxValue(
 	300)
 
+-------- LUA OTHER SECTION ----------
+-- MOCK ALL
+FeatureMgr.AddFeature(Utils.Joaat("LUA_MockAll"), "Mock All",
+	eFeatureType.Toggle):SetDefaultValue(defaultMockAll):Reset()
+-- CHAT REACTIONS
+local chatReactionType = {
+	"AIMING AT YOU",
+	"BAD SCRIPT EVENT",
+	"CHAT BANNED WORD",
+	"CHAT SPAM",
+	"CRASH",
+	"KICK",
+	"REPORT",
+	"SHOOTING AT YOU",
+	"VOTE KICK"
+}
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ChatReactionsList"), "Choose which one to enable",
+	eFeatureType.ComboToggles)
+	:SetList(chatReactionType)
+FeatureMgr.AddFeature(Utils.Joaat("LUA_AimingAtYouInputBox"),
+	"aiming at you", eFeatureType.InputText):SetMaxValue(300)
+FeatureMgr.AddFeature(Utils.Joaat("LUA_BadScriptEventInputBox"),
+	"bad script event", eFeatureType.InputText):SetMaxValue(300)
+FeatureMgr.AddFeature(Utils.Joaat("LUA_BannedWordInputBox"),
+	"chat banned word", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_SpamInputBox"),
+	"chat spam", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_CrashInputBox"),
+	"crash", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_KickInputBox"),
+	"kick", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ReportInputBox"),
+	"report", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_ShootingAtYouInputBox"),
+	"shooting at you", eFeatureType.InputText):SetMaxValue(300)	
+FeatureMgr.AddFeature(Utils.Joaat("LUA_VoteKickInputBox"),
+	"vote kick", eFeatureType.InputText):SetMaxValue(300)		
+
+-- RUSSIAN ROULETTE
+FeatureMgr.AddFeature(Utils.Joaat("LUA_RussianRoulette"), "Russian Roulette",
+	eFeatureType.Toggle, "Write rr <language> to get started and then write a letter to guess the word. " ..
+		"You can only make 5 mistakes, after which you will explode so be careful!\n" ..
+		"<english> <spanish> <french> <german> <italian> <portuguese>"):SetDefaultValue(defaultRussianRouletteEnable):Reset()
+FeatureMgr.AddFeature(Utils.Joaat("LUA_RrInvite"), "Send invite to play",
+	eFeatureType.Button, "",
+		function() 
+			Script.QueueJob(sendInviteToPlay)
+		end)
+		
+local explosionTags = {
+	"EXP_TAG_DONTCARE",
+	"EXP_TAG_GRENADE",
+	"EXP_TAG_GRENADELAUNCHER",
+	"EXP_TAG_STICKYBOMB",
+	"EXP_TAG_MOLOTOV",
+	"EXP_TAG_ROCKET",
+	"EXP_TAG_TANKSHELL",
+	"EXP_TAG_HI_OCTANE",
+	"EXP_TAG_CAR",
+	"EXP_TAG_PLANE",
+	"EXP_TAG_PETROL_PUMP",
+	"EXP_TAG_BIKE",
+	"EXP_TAG_DIR_STEAM",
+	"EXP_TAG_DIR_FLAME",
+	"EXP_TAG_DIR_WATER_HYDRANT",
+	"EXP_TAG_DIR_GAS_CANISTER",
+	"EXP_TAG_BOAT",
+	"EXP_TAG_SHIP_DESTROY",
+	"EXP_TAG_TRUCK",
+	"EXP_TAG_BULLET",
+	"EXP_TAG_SMOKEGRENADELAUNCHER",
+	"EXP_TAG_SMOKEGRENADE",
+	"EXP_TAG_BZGAS",
+	"EXP_TAG_FLARE",
+	"EXP_TAG_GAS_CANISTER",
+	"EXP_TAG_EXTINGUISHER",
+	"EXP_TAG_PROGRAMMABLEAR",
+	"EXP_TAG_TRAIN",
+	"EXP_TAG_BARREL",
+	"EXP_TAG_PROPANE",
+	"EXP_TAG_BLIMP",
+	"EXP_TAG_DIR_FLAME_EXPLODE",
+	"EXP_TAG_TANKER",
+	"EXP_TAG_PLANE_ROCKET",
+	"EXP_TAG_VEHICLE_BULLET",
+	"EXP_TAG_GAS_TANK",
+	"EXP_TAG_BIRD_CRAP",
+	"EXP_TAG_RAILGUN",
+	"EXP_TAG_BLIMP2",
+	"EXP_TAG_FIREWORK",
+	"EXP_TAG_SNOWBALL",
+	"EXP_TAG_PROXMINE",
+	"EXP_TAG_VALKYRIE_CANNON",
+	"EXP_TAG_AIR_DEFENCE",
+	"EXP_TAG_PIPEBOMB",
+	"EXP_TAG_VEHICLEMINE",
+	"EXP_TAG_EXPLOSIVEAMMO",
+	"EXP_TAG_APCSHELL",
+	"EXP_TAG_BOMB_CLUSTER",
+	"EXP_TAG_BOMB_GAS",
+	"EXP_TAG_BOMB_INCENDIARY",
+	"EXP_TAG_BOMB_STANDARD",
+	"EXP_TAG_TORPEDO",
+	"EXP_TAG_TORPEDO_UNDERWATER",
+	"EXP_TAG_BOMBUSHKA_CANNON",
+	"EXP_TAG_BOMB_CLUSTER_SECONDARY",
+	"EXP_TAG_HUNTER_BARRAGE",
+	"EXP_TAG_HUNTER_CANNON",
+	"EXP_TAG_ROGUE_CANNON",
+	"EXP_TAG_MINE_UNDERWATER",
+	"EXP_TAG_ORBITAL_CANNON",
+	"EXP_TAG_BOMB_STANDARD_WIDE",
+	"EXP_TAG_EXPLOSIVEAMMO_SHOTGUN",
+	"EXP_TAG_OPPRESSOR2_CANNON",
+	"EXP_TAG_MORTAR_KINETIC",
+	"EXP_TAG_VEHICLEMINE_KINETIC",
+	"EXP_TAG_VEHICLEMINE_EMP",
+	"EXP_TAG_VEHICLEMINE_SPIKE",
+	"EXP_TAG_VEHICLEMINE_SLICK",
+	"EXP_TAG_VEHICLEMINE_TAR",
+	"EXP_TAG_SCRIPT_DRONE",
+	"EXP_TAG_RAYGUN",
+	"EXP_TAG_BURIEDMINE",
+	"EXP_TAG_SCRIPT_MISSILE",
+	"EXP_TAG_RCTANK_ROCKET",
+	"EXP_TAG_BOMB_WATER",
+	"EXP_TAG_BOMB_WATER_SECONDARY",
+	"EXP_TAG_0xF728C4A9",
+	"EXP_TAG_0xBAEC056F",
+	"EXP_TAG_FLASHGRENADE",
+	"EXP_TAG_STUNGRENADE",
+	"EXP_TAG_0x763D3B3B",
+	"EXP_TAG_SCRIPT_MISSILE_LARGE",
+	"EXP_TAG_SUBMARINE_BIG",
+	"EXP_TAG_EMPLAUNCHER_EMP"
+}
+FeatureMgr.AddFeature(Utils.Joaat("LUA_RrExplosionType"), "", eFeatureType.Combo)
+		:SetList(explosionTags)
+		:SetListIndex(defaultExplosionType) 
+
+-- PLAYER FEATURES
+FeatureMgr.AddFeature(Utils.Joaat("LUA_MockPlayer"), "Mock Player", eFeatureType.Toggle, "Repeat what the player writes\nExample: hello everyone -> hElLo EvErYoNe")
 -------------------------------------------------------------End Ui Elements Definitions-------------------------------------------------------------
 
 -------------------------------------------------------------Example Request-------------------------------------------------------------
@@ -218,7 +377,10 @@ function getResponseText(jsonResponse)
 	return nil
 end
 
+
+local isCbResponding = false
 function processMessage(playerName, message, localPlayerId)
+	isCbResponding = true
 	if debugEnabled then
 		GUI.AddToast("ChatAssistant", ("Process Triggered"):format(), 3000)
 		Logger.Log(eLogColor.YELLOW, 'ChatAssistant', ("Process Triggered"):format())
@@ -333,7 +495,7 @@ function processMessage(playerName, message, localPlayerId)
 	end
 
 	local response = ("%s: %s"):format(responsePrefix, processResponse)
-	local maxLength = 250
+	local maxLength = 255
 	local startIndex = 1
 	local totalLength = #response
 	addMessageToLog(log, response,playerName)
@@ -341,7 +503,6 @@ function processMessage(playerName, message, localPlayerId)
 		while startIndex <= totalLength do
 			local endIndex = math.min(startIndex + maxLength - 1, totalLength)
 			local segment = string.gsub(response:sub(startIndex, endIndex),'\\"','"')
-
 			if not FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_TeamOnlyChatBot")) then
 				GTA.AddChatMessageToPool(localPlayerId, segment, false)
 				GTA.SendChatMessageToEveryone( segment, false)
@@ -352,6 +513,7 @@ function processMessage(playerName, message, localPlayerId)
 			startIndex = endIndex + 1
 		end
 	end
+	isCbResponding = false
 end
 
 function processInsultingMessage(playerName, message, localPlayerId)
@@ -641,7 +803,7 @@ function translateMessage(playerName, message, localPlayerId)
 	if string.len(baseUrl) == 0 then baseUrl = defaultBaseUrl end
 	local completionEndpointUrl = baseUrl .. '/chat/completions'
 	local systemPrompt =
-		("Translate the user input to %s, Response should only include the translated text."):format(
+		("Always translate the user's input text to %s. Do not respond in any other way. Only provide the translated text without any additional comments."):format(
 			languageInput)
 	local modelName =
 		FeatureMgr.GetFeature(Utils.Joaat("LUA_ModelName")):GetStringValue()
@@ -701,8 +863,230 @@ function translateMessage(playerName, message, localPlayerId)
 		end
 	end
 end
+-- mock
+isMockResponding = false
+function mock(message, localPlayerId)
+	isMockResponding = true
+    local result = ""
+	local custom_chars = {a = "4", e = "3", i = "1", o = "0", s = "5", t = "7"}
+    local toggle = true
+	for i = 1, #message do
+        local char = message:sub(i, i)
+        
+        if char:match("%a") then
+            -- Toggle character case
+            if toggle then
+                char = char:lower()
+            else
+                char = char:upper()
+            end
+            toggle = not toggle
+            
+            -- Check if there's a leet speak replacement for the current character
+            local replacement = custom_chars[char]
+            if replacement then
+                result = result .. replacement
+            else
+                result = result .. char
+            end
+        else
+            result = result .. char
+        end
+    end
+    GTA.AddChatMessageToPool(localPlayerId, result, false)
+    GTA.SendChatMessageToEveryone(result, false)
+	isMockResponding = false
+end
 
-function onChatMessage(player, message)
+-- Russian Roulette
+-- List of 100 random words
+local words = {
+    english = {"apple", "banana", "cat", "dog", "elephant", "frog", "giraffe", "house", "ice", "juice",
+			 "kite", "lemon", "monkey", "notebook", "orange", "penguin", "queen", "rabbit", "sun", "tiger",
+			 "umbrella", "vase", "water", "xylophone", "yogurt", "zebra", "car", "ball", "doll", "train", "phone",
+			 "bed", "table", "chair", "lamp", "pencil", "paper", "book", "shirt", "shoe", "hat", "tree", "flower",
+			 "grass", "sky", "cloud", "rain", "snow", "wind", "fire", "hill", "mountain", "river", "lake", "ocean",
+			 "fish", "bird", "bear", "lion", "snake", "cow", "sheep", "horse", "pig", "duck", "chicken", "goat",
+			 "frog", "spider", "ant", "bee", "butterfly", "moth", "bat", "whale", "dolphin", "shark", "octopus",
+			 "starfish","crab", "lobster", "snail", "slug", "worm", "turtle", "crocodile", "alligator", "kangaroo",
+			 "koala", "panda","peacock", "ostrich", "eagle"},
+    spanish = {"manzana", "banana", "gato", "perro", "elefante", "rana", "jirafa", "casa", "hielo", "jugo", "cometa",
+			 "limón", "mono", "cuaderno", "naranja", "pingüino", "reina", "conejo", "sol", "tigre", "paraguas", "florero",
+			 "agua", "xilófono", "yogur", "cebra", "coche", "pelota", "muñeca", "tren", "teléfono", "cama", "mesa", "silla",
+			 "lámpara", "lápiz", "papel", "libro", "camisa", "zapato", "sombrero", "árbol", "flor", "hierba", "cielo", "nube",
+			 "lluvia", "nieve", "viento", "fuego", "colina", "montaña", "río", "lago", "océano", "pez", "pájaro", "oso",
+			 "león","serpiente", "vaca", "oveja", "caballo", "cerdo", "pato", "pollo", "cabra", "rana", "araña", "hormiga",
+			 "abeja","mariposa", "polilla", "murciélago", "ballena", "delfín", "tiburón", "pulpo", "estrella de mar", "cangrejo",
+			 "langosta", "caracol", "babosa", "gusano", "tortuga", "cocodrilo", "caimán", "canguro", "koala", "panda",
+			 "pavo real", "avestruz", "águila"},
+    french = {"pomme", "banane", "chat", "chien", "éléphant", "grenouille", "girafe", "maison", "glace", "jus", "cerf-volant",
+			 "citron", "singe", "cahier", "orange", "pingouin", "reine", "lapin", "soleil", "tigre", "parapluie", "vase", "eau",
+			 "xylophone", "yaourt", "zèbre", "voiture", "balle", "poupée", "train", "téléphone", "lit", "table", "chaise", "lampe",
+			 "crayon", "papier", "livre", "chemise", "chaussure", "chapeau", "arbre", "fleur", "herbe", "ciel", "nuage", "pluie",
+			 "neige", "vent", "feu", "colline", "montagne", "rivière", "lac", "océan", "poisson", "oiseau", "ours", "lion",
+			 "serpent", "vache", "mouton", "cheval", "cochon", "canard", "poulet", "chèvre", "grenouille", "araignée", "fourmi",
+			 "abeille", "papillon", "papillon de nuit", "chauve-souris", "baleine", "dauphin", "requin", "pieuvre", "étoile de mer",
+			 "crabe", "homard", "escargot", "limace", "ver", "tortue", "crocodile", "alligator", "kangourou", "koala", "panda",
+			 "paon", "autruche", "aigle"},
+    german = {"apfel", "banane", "katze", "hund", "elefant", "frosch", "giraffe", "haus", "eis", "saft", "drachen", "zitrone",
+			 "affe", "notizbuch", "orange", "pinguin", "königin", "hase", "sonne", "tiger", "regenschirm", "vase", "wasser",
+			 "xylophon", "joghurt", "zebra", "auto", "ball", "puppe", "zug", "telefon", "bett", "tisch", "stuhl", "lampe",
+			 "bleistift", "papier", "buch", "hemd", "schuh", "hut", "baum", "blume", "gras", "himmel", "wolke", "regen", "schnee",
+			 "wind", "feuer", "hügel", "berg", "fluss", "see", "ozean", "fisch", "vogel", "bär", "löwe", "schlange", "kuh", "schaf",
+			 "pferd", "schwein", "ente", "huhn", "ziege", "frosch", "spinne", "ameise", "biene", "schmetterling", "motte",
+			 "fledermaus", "wal", "delfin", "hai", "krake", "seestern", "krabbe", "hummer", "schnecke", "nacktschnecke", "wurm",
+			 "schildkröte", "krokodil", "alligator", "känguru", "koala", "panda", "pfau", "strauß", "adler"},
+    italian = {"mela", "banana", "gatto", "cane", "elefante", "rana", "giraffa", "casa", "ghiaccio", "succo", "aquilone", "limone",
+			 "scimmia", "quaderno", "arancia", "pinguino", "regina", "coniglio", "sole", "tigre", "ombrello", "vaso", "acqua",
+			 "xilofono", "yogurt", "zebra", "auto", "palla", "bambola", "treno", "telefono", "letto", "tavolo", "sedia",
+			 "lampada", "matita", "carta", "libro", "camicia", "scarpa", "cappello", "albero", "fiore", "erba", "cielo",
+			 "nuvola", "pioggia", "neve", "vento", "fuoco", "collina", "montagna", "fiume", "lago", "oceano", "pesce", "uccello",
+			 "orso", "leone", "serpente", "mucca", "pecora", "cavallo", "maiale", "anatra", "pollo", "capra", "rana", "ragno",
+			 "formica", "ape", "farfalla", "falena", "pipistrello", "balena", "delfino", "squalo", "polpo", "stella marina",
+			 "granchio", "aragosta", "lumaca", "lumaca senza guscio", "verme", "tartaruga", "coccodrillo", "alligatore", "canguro",
+			 "koala", "panda", "pavone", "struzzo", "aquila"},
+    portuguese = {"maçã", "banana", "gato", "cachorro", "elefante", "sapo", "girafa", "casa", "gelo", "suco", "pipa", "limão",
+				 "macaco", "caderno", "laranja", "pinguim", "rainha", "coelho", "sol", "tigre", "guarda-chuva", "vaso", "água",
+				 "xilofone", "iogurte", "zebra", "carro", "bola", "boneca", "trem", "telefone", "cama", "mesa", "cadeira",
+				 "lâmpada", "lápis", "papel", "livro", "camisa", "sapato", "chapéu", "árvore", "flor", "grama", "céu", "nuvem",
+				 "chuva", "neve", "vento", "fogo", "colina", "montanha", "rio", "lago", "oceano", "peixe", "pássaro", "urso",
+				 "leão", "cobra", "vaca", "ovelha", "cavalo", "porco", "pato", "frango", "cabra", "sapo", "aranha", "formiga",
+				 "abelha", "borboleta", "mariposa", "morcego", "baleia", "golfinho", "tubarão", "polvo", "estrela-do-mar",
+				"caranguejo", "lagosta", "caracol", "lesma", "minhoca", "tartaruga", "crocodilo", "jacaré", "canguru", "coala",
+				"panda", "pavão", "avestruz", "águia"}
+}
+
+-- Game state management
+local games = {}
+local maxMistakes = 5
+local isBotResponding = false
+
+function trim(s)
+    return (s:gsub("^%s*(.-)%s*$", "%1"))
+end
+
+-- Function to start the game
+function startGame(playerId, localPlayerId, message)
+	isBotResponding = true
+
+    -- Extract the language parameter
+	local language = trim(message:sub(3)):lower()  -- Extract language part after "rr", trim spaces, and convert to lowercase
+
+    -- Check if the language is supported
+    local wordList = words[language]
+    if not wordList then
+        GTA.AddChatMessageToPool(localPlayerId, "Unsupported language. Please choose a supported language.\n> english\n> spanish\n> french\n> german\n> italian\n> portuguese.", false)
+        GTA.SendChatMessageToEveryone("Unsupported language. Please choose a supported language.\n> english\n> spanish\n> french\n> german\n> italian\n> portuguese.", false)
+        isBotResponding = false
+        return
+    end
+
+    if games[playerId] then
+		GTA.AddChatMessageToPool(localPlayerId, "You already have an ongoing game.", false)
+        GTA.SendChatMessageToEveryone("You already have an ongoing game.", false)
+		isBotResponding = false
+        return
+    end
+
+	local word = wordList[math.random(#wordList)]
+    local gameState = {
+        word = word,
+        display = string.rep("_ ", #word),
+        attempts = {},
+        mistakes = 0
+    }
+    games[playerId] = gameState
+	GTA.AddChatMessageToPool(localPlayerId, "\n[ RUSSIAN ROULETTE ]\nWord extracted: " .. gameState.display, false)
+    GTA.SendChatMessageToEveryone("Word extracted: " .. gameState.display, false)
+	isBotResponding = false
+end
+
+-- Function to handle guesses
+function handleGuess(playerId, guess, localPlayerId)
+	isBotResponding = true
+    local game = games[playerId]
+    if not game then
+        GTA.AddChatMessageToPool(localPlayerId, "You don't have an ongoing game. Use rr <language> to start one.", false)
+        GTA.SendChatMessageToEveryone("You don't have an ongoing game. Use rr /<language> to start one.", false)
+		isBotResponding = false
+        return
+    end
+	
+    if #guess ~= 1 or not guess:match("%a") then
+		isBotResponding = false
+        return
+    end
+
+    guess = guess:lower()
+    if game.attempts[guess] then
+        GTA.AddChatMessageToPool(localPlayerId, "You already guessed that letter.", false)
+        GTA.SendChatMessageToEveryone("You already guessed that letter.", false)
+		isBotResponding = false
+        return
+    end
+
+    game.attempts[guess] = true
+
+    local correct = false
+    local newDisplay = ""
+    for i = 1, #game.word do
+        local char = game.word:sub(i, i)
+        if char == guess then
+            correct = true
+            newDisplay = newDisplay .. char .. " "
+        else
+            newDisplay = newDisplay .. game.display:sub(i * 2 - 1, i * 2) -- Preserve previous display state
+        end
+    end
+
+    game.display = newDisplay
+
+    if correct then
+        GTA.AddChatMessageToPool(localPlayerId, "Correct! " .. game.display, false)
+        GTA.SendChatMessageToEveryone("Correct! " .. game.display, false)
+        if not game.display:match("_") then
+            GTA.AddChatMessageToPool(localPlayerId, "Congratulations! You've guessed the word: " .. game.word, false)
+            GTA.SendChatMessageToEveryone("Congratulations! You've guessed the word: " .. game.word, false)
+            games[playerId] = nil
+        end
+    else
+        game.mistakes = game.mistakes + 1
+        GTA.AddChatMessageToPool(localPlayerId, "Wrong guess. You have " .. (maxMistakes - game.mistakes) .. " mistakes left.", false)
+        GTA.SendChatMessageToPlayer(playerId, "Wrong guess. You have " .. (maxMistakes - game.mistakes) .. " mistakes left.", false)
+        if game.mistakes >= maxMistakes then
+            GTA.AddChatMessageToPool(localPlayerId, "Game Over! The word was: " .. game.word, false)
+            GTA.SendChatMessageToEveryone("Game Over! The word was: " .. game.word, false)
+			local countdown = 3  -- Countdown in seconds
+			while countdown > 0 do
+				GTA.AddChatMessageToPool(localPlayerId, "Explosion in " .. countdown .. " seconds!", false)
+				GTA.SendChatMessageToEveryone("Explosion in " .. countdown .. " seconds!", false)
+				countdown = countdown - 1
+				Script.Yield(1000)  -- Wait for 1 second
+			end
+			local pedHnd = PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(playerId)
+			if ENTITY.DOES_ENTITY_EXIST(pedHnd) then
+				local x, y, z = ENTITY.GET_ENTITY_COORDS(pedHnd, true)
+				local explosionType = FeatureMgr.GetFeature(Utils.Joaat("LUA_RrExplosionType")):GetListIndex()-1
+				FIRE.ADD_EXPLOSION(x, y, z, explosionType, 1.0, true, false, 1.0, false)
+   			end
+            games[playerId] = nil
+        end
+    end
+	isBotResponding = false
+end
+
+function sendInviteToPlay()
+	local localPlayerId = GTA.GetLocalPlayerId()
+	GTA.AddChatMessageToPool(localPlayerId, "Play RUSSIAN ROULETTE!\nWrite rr <language> to get started and then write a letter to guess the word. " ..
+							"You can only make 5 mistakes, after which you will explode so be careful!\n" ..
+							"<english> <spanish> <french> <german> <italian> <portuguese>", false)
+	GTA.SendChatMessageToEveryone("Play RUSSIAN ROULETTE!\nWrite rr <language> to get started and then write a letter to guess the word. " ..
+							"You can only make 5 mistakes, after which you will explode so be careful!\n" ..
+							"<english> <spanish> <french> <german> <italian> <portuguese>", false)
+end
+
+
+function onChatMessage(player, message, localPlayerId)
 	local localPlayerId = GTA.GetLocalPlayerId()
 	local playerId = player.PlayerId
 	local playerName = player:GetName()
@@ -722,10 +1106,20 @@ function onChatMessage(player, message)
 		responsePrefix = defaultResponsePrefix
 	end
 
-	languageInput =
-		FeatureMgr.GetFeature(Utils.Joaat("LUA_LanguageInputBox")):GetStringValue()
-	if string.len(languageInput) == 0 then
-		languageInput = defaultLanguageInput
+	isConversationEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ConversationTranslation"))
+	if(playerId==localPlayerId and isConversationEnabled) then
+		languageInput = 
+			FeatureMgr.GetFeature(Utils.Joaat("LUA_PersonalLanguageInputBox")):GetStringValue()
+		if string.len(languageInput) == 0 then
+			languageInput = defaultLanguageInputPersonal
+		end
+	else
+		languageInput =
+			FeatureMgr.GetFeature(Utils.Joaat("LUA_LanguageInputBox")):GetStringValue()
+		if string.len(languageInput) == 0 then
+			languageInput = defaultLanguageInput
+		end
+		
 	end
 
 	insultResponsePrefix = FeatureMgr.GetFeature(Utils.Joaat(
@@ -734,9 +1128,11 @@ function onChatMessage(player, message)
 		insultResponsePrefix = defaultInsultResponsePrefix
 	end
 	-----------------END INPUTS-----------------
-	if string.len(message) > 5 and -- filters
+	if string.len(message) > 1 and -- filters
 		not string.find(string.lower(message),
 			string.lower(responsePrefix) .. ":") and
+		not string.find(string.lower(message),
+			string.lower("->")) and
 		not string.find(string.lower(message),
 			string.lower(insultResponsePrefix) .. ":") and
 		not string.find(string.lower(message), string.lower(playerName) .. ":") then
@@ -745,7 +1141,7 @@ function onChatMessage(player, message)
 		if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableChatBot")) then
 			debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableDebug"))
 			if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ExcludeYourselfChatBot")) and playerId == localPlayerId) then
-				if string.find(string.lower(message), string.lower(triggerPhrase)) then
+				if string.find(string.lower(message), string.lower(triggerPhrase)) and not isCbResponding then
 					addMessageToLog(log, message, playerName)
 					Script.QueueJob(processMessage, playerName, message, localPlayerId)
 				end
@@ -764,69 +1160,167 @@ function onChatMessage(player, message)
 		if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_EnableAiTranslation")) then
 			debugEnabled = FeatureMgr.IsFeatureEnabled(Utils.Joaat(
 				"LUA_EnableDebug"))
-			if not (FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_ExcludeYourselfAiTranslation")) and playerId == localPlayerId) then
+			if isConversationEnabled or playerId ~= localPlayerId then
 				Script.QueueJob(checkMessageLanguage, message, playerName,
 					localPlayerId)
+			end
+		end
+		-- Mock
+		if not string.find(string.lower(message), string.lower(triggerPhrase)) and not isMockResponding and not isBotResponding then
+			if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_MockPlayer")) then
+				local selected = Utils.GetSelectedPlayer()
+				if selected == playerId then
+					Script.QueueJob(mock,message,localPlayerId)
+				end
+			end
+
+			if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_MockAll")) then
+				Script.QueueJob(mock,message,localPlayerId)
+			end
+		end
+	end
+	-- Russian Roulette
+	if FeatureMgr.IsFeatureEnabled(Utils.Joaat("LUA_RussianRoulette")) then
+		if not isBotResponding then
+			if message:sub(1, 2) == "rr" then
+				Script.QueueJob(startGame, playerId, localPlayerId, message)
+			end
+			if #message == 1 and message:match("%a") then
+				Script.QueueJob(handleGuess, playerId, message, localPlayerId)
 			end
 		end
 	end
 end
 
 EventMgr.RegisterHandler(eLuaEvent.ON_CHAT_MESSAGE, onChatMessage)
+
 -------------------------------------------------------------End Operation functions-------------------------------------------------------------
 
 -------------------------------------------------------------GUI functions-------------------------------------------------------------
-
-local function childWindowElements()
-	if ClickGUI.BeginCustomChildWindow("Options") then
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAuth"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ApiKey"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ServerBaseUrl"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ModelName"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableChatBot"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyChatBot"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ChatBotSystemPrompt"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_TriggerPhrase"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ResponsePrefix"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableInsultBot"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultBotSystemPrompt"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultResponsePrefix"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslation"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfAiTranslation"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"))
-		ImGui.SameLine()
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_LanguageInputBox"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableDebug"))
-		ClickGUI.RenderFeature(Utils.Joaat("LUA_TestButton"))
-		ClickGUI.EndCustomChildWindow()
+-- Lua section
+function clickGUI()
+	local NUM_COLUMNS = 1
+	local flags = ImGuiTableFlags.SizingStretchSame
+	if ImGui.BeginTabBar("CA##TabBar") then		
+		if ImGui.BeginTabItem("AI Bots") then
+			if ImGui.BeginTable("Bots1", NUM_COLUMNS, flags) then
+				ImGui.TableNextRow()
+				for column = 0, NUM_COLUMNS - 1  do
+					ImGui.TableSetColumnIndex(column)
+					if column == 0 then 
+						if ClickGUI.BeginCustomChildWindow("AI Bots") then
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAuth"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ApiKey"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ServerBaseUrl"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ModelName"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableChatBot"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfChatBot"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyChatBot"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ChatBotSystemPrompt"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_TriggerPhrase"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ResponsePrefix"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableInsultBot"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ExcludeYourselfInsultBot"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyInsultBot"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultBotSystemPrompt"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_InsultResponsePrefix"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslation"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ConversationTranslation"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_TeamOnlyAiTranslation"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableAiTranslationEveryone"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_LanguageInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_PersonalLanguageInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_EnableDebug"))
+							ClickGUI.EndCustomChildWindow()
+						end
+					end
+				end
+				ImGui.EndTable()
+			end
+			ImGui.EndTabItem()
+		end
+		if ImGui.BeginTabItem("Other") then
+			if ImGui.BeginTable("Others2", 2, flags) then
+				ImGui.TableNextRow()
+				for column = 0, 1 do
+					ImGui.TableSetColumnIndex(column)
+					if column == 0 then
+						if ClickGUI.BeginCustomChildWindow("Other") then
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_MockAll"))
+							--OTHER STUFF
+							ClickGUI.EndCustomChildWindow()
+						end
+						--[[if ClickGUI.BeginCustomChildWindow("Custom chat reactions") then
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ChatReactionsList"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_AimingAtYouInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_BadScriptEventInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_BannedWordInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_SpamInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_CrashInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_KickInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ReportInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_ShootingAtYouInputBox"))
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_VoteKickInputBox"))
+							--OTHER STUFF
+							ClickGUI.EndCustomChildWindow()
+						end
+						]]--
+					else
+						if ClickGUI.BeginCustomChildWindow("Russian Roulette") then
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_RussianRoulette"))
+							ImGui.SameLine()
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_RrInvite"))
+							--OTHER STUFF
+							ClickGUI.EndCustomChildWindow()
+						end
+						local TypeOut = ("Russian Roulette Explosion Type\n\nDefault: %s"):format(explosionTags[defaultExplosionType+1])
+						if ClickGUI.BeginCustomChildWindow(TypeOut) then
+							ClickGUI.RenderFeature(Utils.Joaat("LUA_RrExplosionType"))
+							ClickGUI.EndCustomChildWindow()
+						end
+					end
+				end
+				ImGui.EndTable()
+			end
+			ImGui.EndTabItem()
+		end
+		ImGui.EndTabBar()
 	end
+end
+
+--player
+local function childWindowGeneral()
+    local playerId = Utils.GetSelectedPlayer()
+    if ClickGUI.BeginCustomChildWindow("General") then
+        ClickGUI.RenderFeature(Utils.Joaat("LUA_MockPlayer"))
+        ClickGUI.EndCustomChildWindow()
+    end
 end
 
 -------------------------------------------------------------End GUI functions-------------------------------------------------------------
 -------------------------------------------------------------Render/Event Functions-------------------------------------------------------------
-local function renderTab()
-	local NUM_COLUMNS = 1
-	local flags = ImGuiTableFlags.SizingStretchSame
-	if ImGui.BeginTable("ChatAssistantTable", NUM_COLUMNS, flags) then
-		ImGui.TableNextRow()
-		for column = 0, NUM_COLUMNS - 1 do
-			ImGui.TableSetColumnIndex(column)
-			if column == 0 then childWindowElements() end
-		end
-		ImGui.EndTable()
-	end
+
+local function renderPlayerTab()
+    local NUM_COLUMNS = 1
+    local flags = ImGuiTableFlags.SizingStretchSame
+    if ImGui.BeginTable("ChatAssistantPlayerTable", NUM_COLUMNS, flags) then
+        ImGui.TableNextRow()
+        for column = 0, NUM_COLUMNS - 1 do
+            ImGui.TableSetColumnIndex(column)
+            if column == 0 then childWindowGeneral() end
+        end
+        ImGui.EndTable()
+    end
 end
 
-ClickGUI.AddTab("ChatAssistant", renderTab)
+ClickGUI.AddTab("ChatAssistant", clickGUI)
+ClickGUI.AddPlayerTab("ChatAssistant", renderPlayerTab)
 
 -------------------------------------------------------------End Render/Event functions-------------------------------------------------------------
