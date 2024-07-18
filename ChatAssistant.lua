@@ -22,7 +22,7 @@ local languageInput = ""                 -- ! Don't change this !
 local max_tokens_chat_bot = 150           -- change this to allow longer responses (don't overdo it, 65 is still fine)
 local chatBotRememberedMessages = 0      -- chatBot will remember N messages * 2 (User request & response)
 										 -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
-local insultBotRememberedMessages = 3    -- insulBot will remember N messages * 2 (User request & response)
+local insultBotRememberedMessages = 0    -- insulBot will remember N messages * 2 (User request & response)
 										 -- I recommend leaving it at 0 or setting a low value so as not to run out of credit quickly
 
 local EnableChatBot = true                 -- Change to true or false   (recommended: true)
