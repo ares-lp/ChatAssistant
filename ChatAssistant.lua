@@ -1065,9 +1065,6 @@ function handleGuess(playerId, guess, localPlayerId)
 			local pedHnd = Natives.InvokeInt(0x50FAC3A3E030A6E1, playerId) -- PLAYER.GET_PLAYER_PED_SCRIPT_INDEX(playerId)
 			if Natives.InvokeBool(0x7239B21A38F536BA,pedHnd) then -- ENTITY.DOES_ENTITY_EXIST(pedHnd)
 				local x, y, z = Natives.InvokeV3(0x3FEF770D40960D5A, pedHnd, true) --ENTITY.GET_ENTITY_COORDS(pedHnd, true)
-				print(x)
-				print(y)
-				print(z)
 				local explosionType = FeatureMgr.GetFeature(Utils.Joaat("LUA_RrExplosionType")):GetListIndex()-1
 				Natives.InvokeVoid(0xE3AD2BDBAEE269AC, x, y, z, explosionType, 1.0, true, false, 1.0, false) --FIRE.ADD_EXPLOSION(x, y, z, explosionType, 1.0, true, false, 1.0, false)
    			end
