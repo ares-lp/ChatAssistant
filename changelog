@@ -1,0 +1,11 @@
+@1.5.0
+Added Alternative Chat (overlay)
+Added Clean on session change.
+Added spawn commands (vehicle, object, ped).
+Added spawnAI (For now it works very badly because it relies on the ai models knowing     the names of objects and peds. I might remove it in the future if I can't               improve).
+Added chat spam: input text, enable/disable, send once, delay.
+Added remembered messages input box for Chatbot and Insultbot (previously editable only   in the file).
+Added Gemini support (choose between OpenAI and Gemini in authorization and set API key   without other changes).
+  Note: Gemini Free not available in Europe and some countries (use VPN). 
+  Limits: 15 requests/min, 1500 requests/day.
+Changed AI Bots tab layout.
