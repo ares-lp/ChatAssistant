@@ -1,3 +1,6 @@
+@1.5.1
+Split too long strings into multiple lines. Redownload only if the Lua Editor window blinks
+
 @1.5.0
 Added Alternative Chat (overlay)
 Added Clean on session change.
